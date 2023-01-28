@@ -382,6 +382,7 @@ pub struct Easy2<H> {
 struct Inner<H> {
     handle: *mut curl_sys::CURL,
     header_list: Option<List>,
+    proxyheader_list: Option<List>,
     resolve_list: Option<List>,
     connect_to_list: Option<List>,
     form: Option<Form>,
@@ -589,6 +590,7 @@ impl<H: Handler> Easy2<H> {
                 inner: Box::new(Inner {
                     handle,
                     header_list: None,
+                    proxyheader_list: None,
                     resolve_list: None,
                     connect_to_list: None,
                     form: None,
@@ -1588,15 +1590,38 @@ impl<H> Easy2<H> {
         self.setopt_ptr(curl_sys::CURLOPT_HTTPHEADER, ptr as *const _)
     }
 
-    // /// Add some headers to send to the HTTP proxy.
-    // ///
-    // /// This function is essentially the same as `http_headers`.
-    // ///
-    // /// By default this option is not set and corresponds to
-    // /// `CURLOPT_PROXYHEADER`
-    // pub fn proxy_headers(&mut self, list: &'a List) -> Result<(), Error> {
-    //     self.setopt_ptr(curl_sys::CURLOPT_PROXYHEADER, list.raw as *const _)
-    // }
+    /// Pass a Some(curl::easy::list::List) of HTTP headers to pass in your 
+    /// HTTP request sent to a proxy.
+    /// 
+    /// The headers set with this option is only ever used in requests 
+    /// sent to a proxy - when there's also a request sent to a host.
+    /// 
+    /// The first line in a request (containing the method, usually a GET 
+    /// or POST) is NOT a header and cannot be replaced using this option.
+    /// Only the lines following the request-line are headers. Adding this
+    /// method line in this list of headers will only cause your request to
+    /// send an invalid header.
+    /// 
+    /// Pass None to this to reset back to no custom headers. 
+    /// 
+    /// By default this option is not set and corresponds to
+    /// `CURLOPT_PROXYHEADER`.
+    /// 
+    pub fn proxy_headers(&mut self, list_maybe: Option<List>) -> Result<(), Error> {
+        if let Some(list) = list_maybe {
+            let ptr = list::raw(&list);
+            self.inner.proxyheader_list = Some(list);
+            return self.setopt_ptr(
+                curl_sys::CURLOPT_PROXYHEADER, 
+                ptr as *const _
+            );
+        } else {
+            return self.setopt_ptr(
+                curl_sys::CURLOPT_PROXYHEADER,
+                0 as *const _
+            );
+        }
+    }
 
     /// Set the contents of the HTTP Cookie header.
     ///
